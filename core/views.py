@@ -15,6 +15,7 @@ from pytz import utc
 from skyfield.api import Star, load
 from skyfield.data import hipparcos
 from skyfield.projections import build_stereographic_projection
+from django.utils.safestring import mark_safe
 
 global df, nomralized_df, maxs, mins 
 df = pd.read_csv(r"names_const_database.csv")
@@ -29,6 +30,14 @@ normalized_df = normalized_df.drop(1)
 normalized_df['id']  = normalized_df['id'].astype(int)
 normalized_df = normalized_df.set_index('id')
 
+# views.py
+import plotly.graph_objs as go
+import plotly.express as px
+from django.http import JsonResponse
+from django.views import View
+from plotly.subplots import make_subplots
+
+
 def home(request):
     return render(request,'index.html')
 
@@ -37,9 +46,15 @@ def details(request):
     lat = request.POST.get('lat')
     long = request.POST.get('long')
     date = str(request.POST.get('date')).replace("T"," ")
+    request.session["lat"] = lat
+    request.session["long"] = long
+    request.session["date"] = date
     print(date)
     print(lat,long)
+    if lat and long and date:
+        return HttpResponseRedirect("/plotly_graph/")
     return render(request,'details.html')
+
 
 def find_star(request):
     if request.method == "POST":
@@ -49,7 +64,7 @@ def find_star(request):
     return render(request, 'star_details.html')
 
 #matplotlib graph, no return value, contains hover logic
-def sky_projection(date, lat, long) : 
+"""def sky_projection(date, lat, long) : 
 
     global df, nomralized_df, maxs, mins 
 
@@ -148,6 +163,127 @@ def sky_projection(date, lat, long) :
 
     fig.canvas.mpl_connect("motion_notify_event", hover)
     plt.show()
+"""
+
+def sky_projection(request):
+    date = request.session["date"]
+    lat = float(request.session["lat"])
+    long = float(request.session["long"])
+    max_magnitude = 3.0
+    if request.method == 'POST':
+        # Get the entered Hipparcos ID from POST data
+        hip_id = request.POST.get('hip_id')
+        print(hip_id)
+        ct = star_details(int(hip_id))
+        print(ct)
+
+    global df, nomralized_df, maxs, mins 
+
+    # de421 shows position of earth and sun in space
+    eph = load('de421.bsp')
+
+    # hipparcos dataset contains star location data
+    with load.open(hipparcos.URL) as f:
+        stars = hipparcos.load_dataframe(f)
+
+    #self made-------------------------------------------------------------------------------------------
+    ts = load.timescale() #used later for conversion to appropriate datatype
+    time=(int(lat)*4) #minutes, 1 deg long = 4 mins
+    dt = datetime.strptime(date, '%Y-%m-%d %H:%M') #converting date time string to datetime format
+    hour=time//60 #getting hours from time
+    minute=(time-int(time))*60 #getting mins from time
+    if hour<0: #will be -ve for west longitudes, +ve for east longitudes
+        dateutc=dt+timedelta(hours=hour,minutes=minute) #bc for west longitudes (i.e +ve longs), you add to get GMT
+    else:
+        dateutc=dt+timedelta(hours=(-1)*hour,minutes=(-1)*minute) #east longitudes you subtract to get GMT
+    dateutc=dateutc.replace(tzinfo=utc) #converting to appropriate format
+    t = ts.utc(dateutc) #getting seconds req by module
+
+    earth = eph["earth"]
+
+    if lat<0:
+        ra=((long+360)/15)
+    else:
+        ra=long/15
+    zenith = Star(ra_hours=ra, dec_degrees=lat)
+
+    center = earth.at(t).observe(zenith)
+
+    projection = build_stereographic_projection(center)
+    field_of_view_degrees = 180.0
+    starpos = earth.at(t).observe(Star.from_dataframe(stars))
+    stars["x"], stars["y"] = projection(starpos)
+
+    bright_stars = (stars.magnitude <= 3)
+    magnitude = stars["magnitude"][bright_stars]
+    xcoords=stars["x"][bright_stars].to_frame()
+    ycoords=stars["y"][bright_stars].to_frame()
+    xcoords_hip = xcoords.copy()
+    xcoords_hip.reset_index(level=0, inplace=True, col_level=0, col_fill='hip')
+    xcoords.reset_index(drop=True, inplace=True)
+    ycoords.reset_index(drop=True, inplace=True)
+    stars['star_index'] = range(len(stars))
+
+    print(stars)
+
+    # Create the Plotly scatter plot
+    valid_magnitude = stars['magnitude'].astype(float)
+    valid_magnitude = valid_magnitude.fillna(0)  # Replace NaN with 0 or any default value
+
+    # Calculate the size of each star based on its magnitude
+    stars['marker_size'] = 50 * 5 ** (valid_magnitude / -2.5)
+
+    # Apply magnitude-based filtering
+    bright_stars = stars.magnitude <= max_magnitude
+
+    # Create a scatter trace for the stars with circular markers
+    trace = go.Scatter(
+        x=stars["x"][bright_stars],
+        y=stars["y"][bright_stars],
+        mode="markers",
+        marker=dict(
+            symbol="circle",
+            size=stars['marker_size'][bright_stars],
+            color="white",
+            opacity=0.5,  # Set the opacity of the stars (adjust as needed)
+            line=dict(width=0),
+        ),
+        hovertext=stars["star_index"][bright_stars].astype(str),  # Use 'star_index' column for hover text
+        hoverinfo="text",  # Show only the hover text, not the default info
+    )
+
+    # Create the Plotly figure
+    fig = go.Figure(trace)
+
+    # Update layout and remove axis ticks and labels
+    fig.update_layout(
+        plot_bgcolor="black",
+        paper_bgcolor="black",
+        xaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            range=[-1, 1],
+        ),
+        yaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            range=[-1, 1],
+        ),
+        title="Sky Projection",
+        title_font=dict(size=16, color="white"),
+    )
+
+    # Convert the Plotly figure to JSON for rendering in the template
+    graph_json = fig.to_json()
+    #ctx = star_details(hip_id)
+    
+
+    return render(request, "plot.html", {"graph_json": mark_safe(graph_json)})
+
+
+
 
 def find_star_hip(hip) : 
     return hip 
@@ -272,14 +408,15 @@ def star_details(hip):
     
     global df, nomralized_df, maxs, mins 
 
-    id = df.get_loc(hip)
+    filtered_df = df[df['hip'] == hip]
+    id = filtered_df.index[0]
     display = dict(df.iloc[id])
     NaN = np.nan
     #print(display)
     print(type(display['hip']))
     for i in display:
         if display[i] is np.nan:
-            display[i] = "not found"
+            display[i] = None
 
     if type(display['hip']) is float:
         hip = display['hip']
@@ -293,7 +430,9 @@ def star_details(hip):
     ci = display['ci']
     temp = 4_600*((1/((0.92*ci)+1.7))+(1/((0.92*ci)+0.62)))+15.411887306085191
     temp_kelvin = temp.round(3)
-
+    
+    lum = display['lum']
+    lum = lum.round(3)
     radius = ((5_778/temp)**2)*(1/lum)**0.5
     radius = radius.round(3)
 
@@ -304,7 +443,7 @@ def star_details(hip):
     hh = int(righta//1)
     mm = int(((righta-hh)*60)//1)
     ss = int(((((righta-hh)*60)-mm)*60)//1)
-    dec = display[dec]
+    dec = display['dec']
     constellation = display['constellation']
 
     vals = f"distance: {(dist)} LY\n\ntemperature(surface): {temp_kelvin}K     \n\nradius: {radius} Solar"
@@ -313,7 +452,6 @@ def star_details(hip):
     print(data)
 
     #other data 
-    lum = display['lum']
-    lum = lum.round(3)
 
     spect = display['spect'].strip()
+    return {"name" : name, "temp" : temp_kelvin, "lum" : lum, "spect": spect, "dist" : dist, "radius": radius, "right_asc" : (hh,mm,ss), "dec" : dec}

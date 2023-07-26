@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Plotly Graph</title>
+    <!-- Include Plotly library -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        /* CSS to style the layout */
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px;
+        }
+
+        .form-container {
+            margin-bottom: 20px;
+        }
+
+        .plot-container {
+            width: 80%;
+        }
+
+        .data-container {
+            width: 80%;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="plot-container">
+            <!-- The plotly graph will be rendered here -->
+            <div id="plotly_graph"></div>
+        </div>
+        <div class="form-container">
+            <!-- Your form HTML code goes here -->
+            <form method="POST" action="{% url 'plotly_graph' %}">
+                {% csrf_token %}
+                <!-- Add the field for entering the Hipparcos ID -->
+                <label for="hip_id">Enter Hipparcos ID:</label><br>
+                <input type="text" name="hip_id" id="hip_id">
+                <button type="submit">Submit</button>
+            </form>
+        </div>
+    </div>
+    <br><br>
+    <div class="container">
+        <div class="data-container" id="data_display">
+            <!-- Data fetched based on the entered Hipparcos ID will be displayed here -->
+        </div>
+    </div>
+
+    <script>
+        // Parse the graph JSON data and render the Plotly graph
+        var graphData = {{ graph_json| safe }};
+        Plotly.newPlot('plotly_graph', graphData.data, graphData.layout);
+
+        // Add an event listener for the form submission
+        document.getElementById('hip_form').addEventListener('submit', function (event) {
+            event.preventDefault(); // Prevent the default form submission behavior
+
+            // Get the entered Hipparcos ID from the form input
+            var hipId = document.getElementById('hip_id').value;
+
+            // You can now use JavaScript to fetch additional data based on the entered Hipparcos ID
+            // For example, you can use fetch() or AJAX to make a request to your server to get the data
+            // and then update the content of the 'data_display' div with the fetched data.
+
+            // For now, let's just display the entered Hipparcos ID as a placeholder
+            var dataDisplayDiv = document.getElementById('data_display');
+            dataDisplayDiv.innerHTML = '<p>Entered Hipparcos ID: ' + hipId + '</p>';
+        });
+    </script>
+</body>
+
+</html>

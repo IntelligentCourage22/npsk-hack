@@ -20,7 +20,8 @@ from core import views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("home/",views.home),
+    path("",views.home),
     path("details/",views.details, name='details'),
-    path("find_star/",views.find_star, name='find_star')
+    path("find_star/",views.find_star, name='find_star'),
+    path('plotly_graph/', views.sky_projection, name='plotly_graph')
 ]
