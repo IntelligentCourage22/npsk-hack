@@ -36,23 +36,12 @@ def home(request):
 def details(request):
     lat = request.POST.get('lat')
     long = request.POST.get('long')
+    date = str(request.POST.get('date')).replace("T"," ")
+    print(date)
     print(lat,long)
     return render(request,'details.html')
 
-def star_details(request):
-    date = request.POST.get('star')
-    print(date)
-    return render(request,'star_details.html')
-    
-
-def index(request) : 
-    ip = requests.get('https://api.ipify.org?format=json')
-    ip_data = json.loads(ip.text)
-    res = requests.get('http://ip-api.com/'+ip_data["ip"])
-    location_data_one = res.text
-    location_data = json.loads(location_data_one)
-    return [location_data["lat"],location_data["lon"]]
-
+#matplotlib graph, no return value, contains hover logic
 def sky_projection(date, lat, long) : 
 
     global df, nomralized_df, maxs, mins 
@@ -156,6 +145,7 @@ def sky_projection(date, lat, long) :
 def find_star_hip(hip) : 
     return hip 
 
+#feed return values of finding star funcitons to star_details() and hr_diag()
 def find_star_name(name) : 
 
     global df, nomralized_df, maxs, mins 
@@ -289,8 +279,6 @@ def star_details(hip):
         display['hip'] = int(hip)
     #if display['name'] is NaN:
         #name="not found"
-
-    
     #imp data 
 
     name = display['name']
