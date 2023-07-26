@@ -179,12 +179,12 @@ def find_star_data(ra, dec, dist, mag, lum, cons):
     if dec : dec = (dec-mins[1])/(maxs[1]-mins[1])
     if dist : dist = (dist-mins[2])/(maxs[2]-mins[2])
     if mag : mag = (mag-mins[6])/(maxs[6]-mins[6])
-    
+
 
     vals_dict_raw = {'ra' : ra, 'dist' : dist, 'lum' : lum, 'dec' : dec, 'mag': mag}
     vals_dict = {}
     for i, j in vals_dict_raw.items() : 
-        if j != -100 : 
+        if j  : 
             vals_dict[i] = j
         
     if cons : 
