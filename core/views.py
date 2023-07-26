@@ -41,6 +41,13 @@ def details(request):
     print(lat,long)
     return render(request,'details.html')
 
+def find_star(request):
+    if request.method == "POST":
+        name = request.POST["name"]
+        hip = request.POST["hip"]
+        cons = request.POST["cons"]
+    return render(request, 'star_details.html')
+
 #matplotlib graph, no return value, contains hover logic
 def sky_projection(date, lat, long) : 
 

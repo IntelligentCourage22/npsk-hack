@@ -10,8 +10,12 @@
 <body>
     <form action="" method="POST">
         {% csrf_token %}
-        <label for="star_details">Enter date and time:</label>
-        <input type="datetime-local" id="star" name="star">
+        <label for="hip">Enter hip</label>
+        <input type="text" name="hip" id="hip"><br>
+        <label for="name">Enter Name</label>
+        <input type="text" name="name" id="name"><br>
+        <label for="constellation">Enter constellation</label>
+        <input type="text" name="cons" id="cons"><br>
         <input type="submit">
     </form>
 </body>
