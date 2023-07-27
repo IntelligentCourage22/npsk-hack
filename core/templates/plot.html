@@ -48,6 +48,12 @@
     <br><br>
     <div class="container">
         <div class="data-container" id="data_display">
+            <h2>Star Details</h2>
+            <ul>
+                {% for key, value in star_details.items %}
+                <li><strong>{{ key }}:</strong> {{ value }}</li>
+                {% endfor %}
+            </ul>
             <!-- Data fetched based on the entered Hipparcos ID will be displayed here -->
         </div>
     </div>
@@ -63,9 +69,6 @@
 
             // Get the entered Hipparcos ID from the form input
             var hipId = document.getElementById('hip_id').value;
-
-            // You can now use JavaScript to fetch additional data based on the entered Hipparcos ID
-            // For example, you can use fetch() or AJAX to make a request to your server to get the data
             // and then update the content of the 'data_display' div with the fetched data.
 
             // For now, let's just display the entered Hipparcos ID as a placeholder

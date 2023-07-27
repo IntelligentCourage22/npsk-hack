@@ -98,45 +98,48 @@
         <div style="width: 50%; padding: 20px;">
             <!-- Star Gazing Form -->
             <div class="form-container">
-                <h2>Enter any one</h2>
                 <form method="POST">
                     {% csrf_token %}
-                    <label for="name">Name:</label>
-                    <input type="text" id="name" name="name">
+                    <label for="j200_ra">J2000 RA:</label>
+                    <input type="text" id="j200_ra" name="j200_ra" required>
 
-                    <label for="hip_id">HIP Value:</label>
-                    <input type="text" id="hip_id" name="hip_id">
+                    <label for="j200_dec">J2000 Dec:</label>
+                    <input type="text" id="j200_dec" name="j200_dec" required>
+
+                    <label for="dist">Distance:</label>
+                    <input type="text" id="dist" name="dist" required>
+
+                    <label for="mag">Magnitude:</label>
+                    <input type="text" id="mag" name="mag" required>
+
+                    <label for="lum">Luminosity:</label>
+                    <input type="text" id="lum" name="lum" required>
+
+                    <label for="constellation">Constellation:</label>
+                    <input type="text" id="constellation" name="constellation" required>
 
                     <input type="submit" value="Submit">
                 </form>
-
             </div>
-
-            <p><a href="{% url 'telescope' %}">Don't have these values?</a></p>
         </div>
-    </div>
-    <div style="width: 50%; padding: 20px;">
-        <!-- Star Details Display -->
-        {% if star_details %}
-        {% for key, value in star_details.items %}
-        <li><strong>{{ key }}:</strong> {{ value }}</li>
-        {% endfor %}
-        {% endif %}
-        {% if star_list %}
-        <h1>The star could also be:</h1>
-        {% for star in star_list %}
-        <li><strong>{{star}}</strong> </li>
-        {% endfor %}
-        {% endif %}
+        <div style="width: 50%; padding: 20px;">
+            <!-- Star Details Display -->
+            {% if star_details %}
+            {% for key, value in star_details.items %}
+            <li><strong>{{ key }}:</strong> {{ value }}</li>
+            {% endfor %}
+            {% endif %}
+            {% if star_list %}
+            <h1>The star could also be:</h1>
+            {% for star in star_list %}
+            <li><strong>{{star}}</strong> </li>
+            {% endfor %}
+            {% endif %}
 
-    </div>
+        </div>
     </div>
 
     <script>
-        function showAdditionalForm() {
-            const additionalForm = document.getElementById("additional-form");
-            additionalForm.style.display = "block";
-        }
     </script>
 </body>
 

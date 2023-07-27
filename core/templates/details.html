@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Star Gazing Form</title>
     <style>
         @import url("https://fonts.googleapis.com/css2?family=Sansita+Swashed:wght@600&display=swap");
 
@@ -16,6 +16,7 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
+            background-color: #f0f0f0;
         }
 
         .center {
@@ -23,6 +24,7 @@
             padding: 50px 50px;
             background: #fff;
             border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
 
         .center h1 {
@@ -30,16 +32,16 @@
             padding: 10px;
             color: #000;
             letter-spacing: 5px;
-            margin-bottom: 60px;
+            margin-bottom: 40px;
             font-weight: bold;
-            padding-left: 10px;
+            text-align: center;
         }
 
         .center .inputbox {
             position: relative;
             width: 300px;
             height: 50px;
-            margin-bottom: 50px;
+            margin-bottom: 30px;
         }
 
         .center .inputbox input {
@@ -74,15 +76,41 @@
             font-size: 1em;
         }
 
-        .center .inputbox [type="button"] {
+        .center .inputbox [type="submit"] {
             width: 50%;
             background: dodgerblue;
             color: #fff;
             border: #fff;
+            cursor: pointer;
+            transition: 0.2s;
         }
 
-        .center .inputbox:hover [type="button"] {
+        .center .inputbox [type="submit"]:hover {
             background: linear-gradient(45deg, greenyellow, dodgerblue);
+        }
+
+        .center .star-gaze-btn {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .center .star-gaze-btn button {
+            width: 200px;
+            padding: 10px;
+            background-color: dodgerblue;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.1em;
+            font-family: 'Sansita Swashed', cursive;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .center .star-gaze-btn button:hover {
+            background-color: #38a3a3;
         }
     </style>
 </head>
@@ -93,33 +121,25 @@
         <form method="POST">
             {% csrf_token %}
             <div class="inputbox">
-                <input type="text" id="lat" name="lat" min="1">
+                <input type="text" id="lat" name="lat" required>
                 <span>Latitude</span>
             </div>
             <div class="inputbox">
-                <input type="text" id="long" name="long" min="1">
+                <input type="text" id="long" name="long" required>
                 <span>Longitude</span>
             </div>
             <div class="inputbox">
-                <input type="datetime-local" id="date" name="date">
-                <span>Date: </span>
+                <input type="datetime-local" id="date" name="date" required>
+                <span> </span>
             </div>
             <div class="inputbox">
-                <input type="submit" value="submit">
+                <input type="submit" value="Submit">
             </div>
-
         </form>
+        <div class="star-gaze-btn">
+            <button onclick="starGaze()">Star Gaze Now</button>
+        </div>
     </div>
-    <!--form action="" method="POST">
-        {% csrf_token %}
-        <label for="lat">Latitude:</label><br>
-        <input type="text" id="lat" name="lat" min="1"><br>
-        <label for="lat">Longitude:</label><br>
-        <input type="text" id="long" name="long" min="1"><br>
-        <label for="date">Date:</label>
-        <input type="datetime-local" id="date" name="date">
-        <button type="submit" class="">Submit</button>
-    </!--form-->
 </body>
 
 </html>

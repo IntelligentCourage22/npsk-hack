@@ -7,28 +7,28 @@ import json
 import tkinter as tk
 import pandas as pd
 import numpy as np
-import math 
+import math
 import matplotlib.pyplot as plt
-from PIL import Image,ImageTk
-from datetime import datetime,timedelta
+from PIL import Image, ImageTk
+from datetime import datetime, timedelta
 from pytz import utc
 from skyfield.api import Star, load
 from skyfield.data import hipparcos
 from skyfield.projections import build_stereographic_projection
 from django.utils.safestring import mark_safe
 
-global df, nomralized_df, maxs, mins 
+global df, nomralized_df, maxs, mins
 df = pd.read_csv(r"names_const_database.csv")
-df['id']  = df['id'].astype(int)
-df = df.set_index('id')
+df["id"] = df["id"].astype(int)
+df = df.set_index("id")
 normalized_df = pd.read_csv("normalized_database.csv")
-#first row of normalized_database has max value of each col and second row has min values (done in excel)
+# first row of normalized_database has max value of each col and second row has min values (done in excel)
 maxs = np.array(normalized_df.iloc[0])[1:]
 mins = np.array(normalized_df.iloc[1])[1:]
 normalized_df = normalized_df.drop(0)
 normalized_df = normalized_df.drop(1)
-normalized_df['id']  = normalized_df['id'].astype(int)
-normalized_df = normalized_df.set_index('id')
+normalized_df["id"] = normalized_df["id"].astype(int)
+normalized_df = normalized_df.set_index("id")
 
 # views.py
 import plotly.graph_objs as go
@@ -39,31 +39,53 @@ from plotly.subplots import make_subplots
 
 
 def home(request):
-    return render(request,'index.html')
+    return render(request, "index.html")
 
 
 def details(request):
-    lat = request.POST.get('lat')
-    long = request.POST.get('long')
-    date = str(request.POST.get('date')).replace("T"," ")
+    lat = request.POST.get("lat")
+    long = request.POST.get("long")
+    date = str(request.POST.get("date")).replace("T", " ")
     request.session["lat"] = lat
     request.session["long"] = long
     request.session["date"] = date
     print(date)
-    print(lat,long)
+    print(lat, long)
     if lat and long and date:
         return HttpResponseRedirect("/plotly_graph/")
-    return render(request,'details.html')
+    return render(request, "details.html")
 
 
 def find_star(request):
+    ctx = None
     if request.method == "POST":
         name = request.POST["name"]
-        hip = request.POST["hip"]
-        cons = request.POST["cons"]
-    return render(request, 'star_details.html')
+        hip = request.POST["hip_id"]
+        if name:
+            hip = find_star_name(name)
+        ctx = star_details(int(hip))
+    return render(request, "star_details.html", {"star_details": ctx})
 
-#matplotlib graph, no return value, contains hover logic
+
+def telescope(request):
+    star_list = None
+    ctx = None
+    if request.method == "POST":
+        ra = request.POST["j200_ra"]
+        dec = request.POST["j200_dec"]
+        dist = request.POST["dist"]
+        mag = request.POST["mag"]
+        lum = request.POST["lum"]
+        cons = request.POST["constellation"]
+        star_list = find_star_data(ra, dec, dist, mag, lum, cons)
+        star_data = find_star_data(ra, dec, dist, mag, lum, cons)[0]
+        ctx = star_details(star_data)
+    return render(
+        request, "telescope.html", {"star_list": star_list, "star_details": ctx}
+    )
+
+
+# matplotlib graph, no return value, contains hover logic
 """def sky_projection(date, lat, long) : 
 
     global df, nomralized_df, maxs, mins 
@@ -165,46 +187,55 @@ def find_star(request):
     plt.show()
 """
 
+
 def sky_projection(request):
     date = request.session["date"]
     lat = float(request.session["lat"])
     long = float(request.session["long"])
     max_magnitude = 3.0
-    if request.method == 'POST':
-        # Get the entered Hipparcos ID from POST data
-        hip_id = request.POST.get('hip_id')
-        print(hip_id)
-        ct = star_details(int(hip_id))
-        print(ct)
 
-    global df, nomralized_df, maxs, mins 
+    # Get the entered Hipparcos ID from POST data
+
+    ct = None
+    hr_diagram_url = None
+    if request.method == "POST":
+        hip_id = request.POST.get("hip_id")
+        ct = star_details(int(hip_id))
+
+    global df, nomralized_df, maxs, mins
 
     # de421 shows position of earth and sun in space
-    eph = load('de421.bsp')
+    eph = load("de421.bsp")
 
     # hipparcos dataset contains star location data
     with load.open(hipparcos.URL) as f:
         stars = hipparcos.load_dataframe(f)
 
-    #self made-------------------------------------------------------------------------------------------
-    ts = load.timescale() #used later for conversion to appropriate datatype
-    time=(int(lat)*4) #minutes, 1 deg long = 4 mins
-    dt = datetime.strptime(date, '%Y-%m-%d %H:%M') #converting date time string to datetime format
-    hour=time//60 #getting hours from time
-    minute=(time-int(time))*60 #getting mins from time
-    if hour<0: #will be -ve for west longitudes, +ve for east longitudes
-        dateutc=dt+timedelta(hours=hour,minutes=minute) #bc for west longitudes (i.e +ve longs), you add to get GMT
+    # self made-------------------------------------------------------------------------------------------
+    ts = load.timescale()  # used later for conversion to appropriate datatype
+    time = int(lat) * 4  # minutes, 1 deg long = 4 mins
+    dt = datetime.strptime(
+        date, "%Y-%m-%d %H:%M"
+    )  # converting date time string to datetime format
+    hour = time // 60  # getting hours from time
+    minute = (time - int(time)) * 60  # getting mins from time
+    if hour < 0:  # will be -ve for west longitudes, +ve for east longitudes
+        dateutc = dt + timedelta(
+            hours=hour, minutes=minute
+        )  # bc for west longitudes (i.e +ve longs), you add to get GMT
     else:
-        dateutc=dt+timedelta(hours=(-1)*hour,minutes=(-1)*minute) #east longitudes you subtract to get GMT
-    dateutc=dateutc.replace(tzinfo=utc) #converting to appropriate format
-    t = ts.utc(dateutc) #getting seconds req by module
+        dateutc = dt + timedelta(
+            hours=(-1) * hour, minutes=(-1) * minute
+        )  # east longitudes you subtract to get GMT
+    dateutc = dateutc.replace(tzinfo=utc)  # converting to appropriate format
+    t = ts.utc(dateutc)  # getting seconds req by module
 
     earth = eph["earth"]
 
-    if lat<0:
-        ra=((long+360)/15)
+    if lat < 0:
+        ra = (long + 360) / 15
     else:
-        ra=long/15
+        ra = long / 15
     zenith = Star(ra_hours=ra, dec_degrees=lat)
 
     center = earth.at(t).observe(zenith)
@@ -214,42 +245,50 @@ def sky_projection(request):
     starpos = earth.at(t).observe(Star.from_dataframe(stars))
     stars["x"], stars["y"] = projection(starpos)
 
-    bright_stars = (stars.magnitude <= 3)
+    bright_stars = stars.magnitude <= 3
     magnitude = stars["magnitude"][bright_stars]
-    xcoords=stars["x"][bright_stars].to_frame()
-    ycoords=stars["y"][bright_stars].to_frame()
+    xcoords = stars["x"][bright_stars].to_frame()
+    ycoords = stars["y"][bright_stars].to_frame()
     xcoords_hip = xcoords.copy()
-    xcoords_hip.reset_index(level=0, inplace=True, col_level=0, col_fill='hip')
+    xcoords_hip.reset_index(level=0, inplace=True, col_level=0, col_fill="hip")
     xcoords.reset_index(drop=True, inplace=True)
     ycoords.reset_index(drop=True, inplace=True)
-    stars['star_index'] = range(len(stars))
+    stars["star_index"] = range(len(stars))
 
     print(stars)
 
     # Create the Plotly scatter plot
-    valid_magnitude = stars['magnitude'].astype(float)
-    valid_magnitude = valid_magnitude.fillna(0)  # Replace NaN with 0 or any default value
+    valid_magnitude = stars["magnitude"].astype(float)
+    valid_magnitude = valid_magnitude.fillna(
+        0
+    )  # Replace NaN with 0 or any default value
 
     # Calculate the size of each star based on its magnitude
-    stars['marker_size'] = 50 * 5 ** (valid_magnitude / -2.5)
+    # Adjust the marker size to control the spread of stars
+    stars["marker_size"] = 5 * 10 ** (valid_magnitude / -5)
 
-    # Apply magnitude-based filtering
-    bright_stars = stars.magnitude <= max_magnitude
+    # Calculate the opacity based on magnitude to control visibility
+    max_magnitude = valid_magnitude.max()
+    stars["opacity"] = 1 - (valid_magnitude / max_magnitude)
+    stars["opacity"] = stars["opacity"].clip(0, 1)  # Clip values to be within [0, 1]
+
+    # Create a hovertext to display HIP ID when hovering over stars
+    stars["hover_text"] = stars["star_index"].astype(str)
 
     # Create a scatter trace for the stars with circular markers
     trace = go.Scatter(
-        x=stars["x"][bright_stars],
-        y=stars["y"][bright_stars],
+        x=stars["x"],
+        y=stars["y"],
         mode="markers",
         marker=dict(
             symbol="circle",
-            size=stars['marker_size'][bright_stars],
+            size=stars["marker_size"],
             color="white",
-            opacity=0.5,  # Set the opacity of the stars (adjust as needed)
+            opacity=stars["opacity"],
             line=dict(width=0),
         ),
-        hovertext=stars["star_index"][bright_stars].astype(str),  # Use 'star_index' column for hover text
-        hoverinfo="text",  # Show only the hover text, not the default info
+        hovertext=stars["hover_text"],  # Set the hovertext to display HIP ID
+        hoverinfo="text",  # Show only the hover text
     )
 
     # Create the Plotly figure
@@ -277,64 +316,71 @@ def sky_projection(request):
 
     # Convert the Plotly figure to JSON for rendering in the template
     graph_json = fig.to_json()
-    #ctx = star_details(hip_id)
-    
+    # ctx = star_details(hip_id)
 
-    return render(request, "plot.html", {"graph_json": mark_safe(graph_json)})
+    context = {
+        "graph_json": mark_safe(graph_json),  # Your plot data in JSON format
+        "star_details": ct,
+        "hr_diagram_url": hr_diagram_url,  # Dictionary containing star details
+    }
+
+    return render(request, "plot.html", context)
 
 
+def find_star_hip(hip):
+    return hip
 
 
-def find_star_hip(hip) : 
-    return hip 
-
-#feed return values of finding star funcitons to star_details() and hr_diag()
-def find_star_name(name) : 
-
-    global df, nomralized_df, maxs, mins 
+# feed return values of finding star funcitons to star_details() and hr_diag()
+def find_star_name(name):
+    global df, nomralized_df, maxs, mins
 
     constellations = pd.read_csv("constellations.csv")
     constellations = constellations.set_index("full")
     const_dict = constellations.to_dict()
-    #print(const_dict)
-    new_df = df[df['name'].notna()]
-    id = new_df[new_df['name'].str.contains(name)]
-    if not id.empty : 
+    # print(const_dict)
+    new_df = df[df["name"].notna()]
+    id = new_df[new_df["name"].str.contains(name)]
+    if not id.empty:
         return int(id["hip"])
-    else : return False 
+    else:
+        return False
 
-def find_star_data(ra, dec, dist, mag, lum, cons): 
 
-    if lum : 
+def find_star_data(ra, dec, dist, mag, lum, cons):
+    if lum:
         lum = math.log(lum)
-        lum = lum/(maxs[-1]-mins[-1])
-    if ra : ra = (ra-mins[0])/(maxs[0]-mins[0])
-    if dec : dec = (dec-mins[1])/(maxs[1]-mins[1])
-    if dist : dist = (dist-mins[2])/(maxs[2]-mins[2])
-    if mag : mag = (mag-mins[6])/(maxs[6]-mins[6])
+        lum = lum / (maxs[-1] - mins[-1])
+    if ra:
+        ra = (ra - mins[0]) / (maxs[0] - mins[0])
+    if dec:
+        dec = (dec - mins[1]) / (maxs[1] - mins[1])
+    if dist:
+        dist = (dist - mins[2]) / (maxs[2] - mins[2])
+    if mag:
+        mag = (mag - mins[6]) / (maxs[6] - mins[6])
 
-
-    vals_dict_raw = {'ra' : ra, 'dist' : dist, 'lum' : lum, 'dec' : dec, 'mag': mag}
+    vals_dict_raw = {"ra": ra, "dist": dist, "lum": lum, "dec": dec, "mag": mag}
     vals_dict = {}
-    for i, j in vals_dict_raw.items() : 
-        if j  : 
+    for i, j in vals_dict_raw.items():
+        if j:
             vals_dict[i] = j
-        
-    if cons : 
+
+    if cons:
         cons_df = df[df["constellation"] == cons]
-        good_ids = cons_df['id'].tolist()
+        good_ids = cons_df["id"].tolist()
         dotp_df = normalized_df.loc[good_ids]
 
     vals_arr = np.array(list(vals_dict.values()))
-    normalized_ref_vec =  vals_arr / np.linalg.norm(vals_arr)
-    keys_lst = list(vals_dict.keys()) 
+    normalized_ref_vec = vals_arr / np.linalg.norm(vals_arr)
+    keys_lst = list(vals_dict.keys())
 
-    #take only those colums which are useful to us 
+    # take only those colums which are useful to us
     dotp_df = normalized_df.loc[:, keys_lst]
-    #dotp_df = dotp_df.dropna()
-    #print(dotp_df)
+    # dotp_df = dotp_df.dropna()
+    # print(dotp_df)
 
-    for k, v in vals_dict.items() : 
+    for k, v in vals_dict.items():
         range_col = ((v - 0.1), (v + 0.1))
         mask = dotp_df[k].between(*range_col)
         dotp_df = dotp_df[mask]
@@ -342,116 +388,134 @@ def find_star_data(ra, dec, dist, mag, lum, cons):
     index_lst = dotp_df.index.to_list()
     print(dotp_df)
     dot_plst = []
-    for i in index_lst : 
+    for i in index_lst:
         vector = dotp_df.loc[i]
         vector = vector.to_numpy()
         vector_norm = vector / np.linalg.norm(vector)
         cos_theta = np.dot(vector_norm, normalized_ref_vec)
         dot_plst.append(cos_theta)
 
-    dotp_df['cos_theta'] = dot_plst
-    dotp_df_sorted = dotp_df.sort_values(by='cos_theta', ascending=False)
+    dotp_df["cos_theta"] = dot_plst
+    dotp_df_sorted = dotp_df.sort_values(by="cos_theta", ascending=False)
     id_lst = dotp_df_sorted.index.to_list()
-    hip_lst_raw = df.loc[id_lst, 'hip']
+    hip_lst_raw = df.loc[id_lst, "hip"]
     hip_lst = []
-    for i in hip_lst_raw : 
-        try : 
+    for i in hip_lst_raw:
+        try:
             x = int(i)
             hip_lst.append(x)
-        except : pass
-    
+        except:
+            pass
+
     return hip_lst
 
-def hr_diag(hip):
 
-    global df, nomralized_df, maxs, mins 
+def hr_diag(hip):
+    global df, nomralized_df, maxs, mins
 
     id = df.get_loc(hip)
 
-    am=df._get_value(id,'absmag')
-    bv=df._get_value(id,'ci')
-#----initialise mega list
-    x=[]
-    y=[]
-#----initialise graph
+    am = df._get_value(id, "absmag")
+    bv = df._get_value(id, "ci")
+    # ----initialise mega list
+    x = []
+    y = []
+    # ----initialise graph
     fig = plt.figure(linewidth=0)
-    fig.patch.set_facecolor('black')
-    ax=plt.axes()
-    ax.set_xlim(-1,3)
-    ax.set_ylim(-5,20)
-    ax.xaxis.label.set_color('w')
-    ax.yaxis.label.set_color('w')
-    ax.spines['bottom'].set_color('w')
-    ax.spines['top'].set_color('w') 
-    ax.spines['right'].set_color('w')
-    ax.spines['left'].set_color('w')
-    ax.tick_params(colors='w', which='both')
+    fig.patch.set_facecolor("black")
+    ax = plt.axes()
+    ax.set_xlim(-1, 3)
+    ax.set_ylim(-5, 20)
+    ax.xaxis.label.set_color("w")
+    ax.yaxis.label.set_color("w")
+    ax.spines["bottom"].set_color("w")
+    ax.spines["top"].set_color("w")
+    ax.spines["right"].set_color("w")
+    ax.spines["left"].set_color("w")
+    ax.tick_params(colors="w", which="both")
     ax.set_facecolor("#000000")
-#----- use data and put in mega list
+    # ----- use data and put in mega list
     for i in range(4999):
-        absmag=df._get_value(i,'absmag')
-        ci=df._get_value(i,'ci')
+        absmag = df._get_value(i, "absmag")
+        ci = df._get_value(i, "ci")
         x.append(ci)
         y.append(absmag)
-#-------- plotting + making it look decent
+    # -------- plotting + making it look decent
     plt.grid()
-    plt.plot(bv,am,"w",marker="o",markersize=6)
-    plt.scatter(x,y,c=x,cmap='YlOrRd',s=0.05)
-    plt.text(bv-0.25,am+0.75,"your star",fontdict=dict(color='#bdbdbd', alpha=1, size=7))
+    plt.plot(bv, am, "w", marker="o", markersize=6)
+    plt.scatter(x, y, c=x, cmap="YlOrRd", s=0.05)
+    plt.text(
+        bv - 0.25,
+        am + 0.75,
+        "your star",
+        fontdict=dict(color="#bdbdbd", alpha=1, size=7),
+    )
     ax.invert_yaxis()
     plt.title("H-R diagram")
     plt.ylabel("absolute magnitude")
     plt.xlabel("B-V value")
-    plt.savefig('hr_diagram',pad_inches=0)
+    plt.savefig("hr_diagram", pad_inches=0)
 
-def star_details(hip): 
-    
-    global df, nomralized_df, maxs, mins 
 
-    filtered_df = df[df['hip'] == hip]
+def star_details(hip):
+    global df, nomralized_df, maxs, mins
+
+    filtered_df = df[df["hip"] == hip]
     id = filtered_df.index[0]
     display = dict(df.iloc[id])
     NaN = np.nan
-    #print(display)
-    print(type(display['hip']))
+    # print(display)
+    print(type(display["hip"]))
     for i in display:
         if display[i] is np.nan:
             display[i] = None
 
-    if type(display['hip']) is float:
-        hip = display['hip']
-        display['hip'] = int(hip)
-    #if display['name'] is NaN:
-        #name="not found"
-    #imp data 
+    if type(display["hip"]) is float:
+        hip = display["hip"]
+        display["hip"] = int(hip)
+    # if display['name'] is NaN:
+    # name="not found"
+    # imp data
 
-    name = display['name']
+    name = display["name"]
 
-    ci = display['ci']
-    temp = 4_600*((1/((0.92*ci)+1.7))+(1/((0.92*ci)+0.62)))+15.411887306085191
+    ci = display["ci"]
+    temp = (
+        4_600 * ((1 / ((0.92 * ci) + 1.7)) + (1 / ((0.92 * ci) + 0.62)))
+        + 15.411887306085191
+    )
     temp_kelvin = temp.round(3)
-    
-    lum = display['lum']
+
+    lum = display["lum"]
     lum = lum.round(3)
-    radius = ((5_778/temp)**2)*(1/lum)**0.5
+    radius = ((5_778 / temp) ** 2) * (1 / lum) ** 0.5
     radius = radius.round(3)
 
-    dist = display['dist']*3.26156
+    dist = display["dist"] * 3.26156
     dist = dist.round(3)
 
-    righta = display['ra']
-    hh = int(righta//1)
-    mm = int(((righta-hh)*60)//1)
-    ss = int(((((righta-hh)*60)-mm)*60)//1)
-    dec = display['dec']
-    constellation = display['constellation']
+    righta = display["ra"]
+    hh = int(righta // 1)
+    mm = int(((righta - hh) * 60) // 1)
+    ss = int(((((righta - hh) * 60) - mm) * 60) // 1)
+    dec = display["dec"]
+    constellation = display["constellation"]
 
     vals = f"distance: {(dist)} LY\n\ntemperature(surface): {temp_kelvin}K     \n\nradius: {radius} Solar"
     print(vals)
-    data=f"right ascension(J2000): {hh}hrs {mm}m {ss}s\n\ndeclination(J2000): {dec}       "
+    data = f"right ascension(J2000): {hh}hrs {mm}m {ss}s\n\ndeclination(J2000): {dec}       "
     print(data)
 
-    #other data 
+    # other data
 
-    spect = display['spect'].strip()
-    return {"name" : name, "temp" : temp_kelvin, "lum" : lum, "spect": spect, "dist" : dist, "radius": radius, "right_asc" : (hh,mm,ss), "dec" : dec}
+    spect = display["spect"].strip()
+    return {
+        "name": name,
+        "temp": temp_kelvin,
+        "lum": lum,
+        "spect": spect,
+        "dist": dist,
+        "radius": radius,
+        "right_asc": (hh, mm, ss),
+        "dec": dec,
+    }
