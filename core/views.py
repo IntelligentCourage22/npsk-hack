@@ -70,6 +70,7 @@ def find_star(request):
 def telescope(request):
     star_list = None
     ctx = None
+    star_hip = None
     if request.method == "POST":
         ra = request.POST["j200_ra"]
         dec = request.POST["j200_dec"]
@@ -77,11 +78,15 @@ def telescope(request):
         mag = request.POST["mag"]
         lum = request.POST["lum"]
         cons = request.POST["constellation"]
-        star_list = find_star_data(ra, dec, dist, mag, lum, cons)
+        star_list = find_star_data(ra, dec, dist, mag, lum, cons)[1:]
         star_data = find_star_data(ra, dec, dist, mag, lum, cons)[0]
         ctx = star_details(star_data)
+        if ctx:
+            star_hip = ctx["hip"]
     return render(
-        request, "telescope.html", {"star_list": star_list, "star_details": ctx}
+        request,
+        "telescope.html",
+        {"star_list": star_list, "star_details": ctx, "star_hip": star_hip},
     )
 
 
@@ -349,16 +354,16 @@ def find_star_name(name):
 
 def find_star_data(ra, dec, dist, mag, lum, cons):
     if lum:
-        lum = math.log(lum)
+        lum = math.log(float(lum))
         lum = lum / (maxs[-1] - mins[-1])
     if ra:
-        ra = (ra - mins[0]) / (maxs[0] - mins[0])
+        ra = (float(ra) - mins[0]) / (maxs[0] - mins[0])
     if dec:
-        dec = (dec - mins[1]) / (maxs[1] - mins[1])
+        dec = (float(dec) - mins[1]) / (maxs[1] - mins[1])
     if dist:
-        dist = (dist - mins[2]) / (maxs[2] - mins[2])
+        dist = (float(dist) - mins[2]) / (maxs[2] - mins[2])
     if mag:
-        mag = (mag - mins[6]) / (maxs[6] - mins[6])
+        mag = (float(mag) - mins[6]) / (maxs[6] - mins[6])
 
     vals_dict_raw = {"ra": ra, "dist": dist, "lum": lum, "dec": dec, "mag": mag}
     vals_dict = {}
@@ -367,8 +372,9 @@ def find_star_data(ra, dec, dist, mag, lum, cons):
             vals_dict[i] = j
 
     if cons:
+        cons = cons.strip().lower().title()
         cons_df = df[df["constellation"] == cons]
-        good_ids = cons_df["id"].tolist()
+        good_ids = cons_df.index.tolist()
         dotp_df = normalized_df.loc[good_ids]
 
     vals_arr = np.array(list(vals_dict.values()))
@@ -407,7 +413,7 @@ def find_star_data(ra, dec, dist, mag, lum, cons):
         except:
             pass
 
-    return hip_lst
+    return hip_lst[:5]
 
 
 def hr_diag(hip):
@@ -454,7 +460,7 @@ def hr_diag(hip):
     plt.title("H-R diagram")
     plt.ylabel("absolute magnitude")
     plt.xlabel("B-V value")
-    plt.savefig("hr_diagram", pad_inches=0)
+    plt.savefig("hr_diagram.png", pad_inches=0)
 
 
 def star_details(hip):
@@ -510,12 +516,12 @@ def star_details(hip):
 
     spect = display["spect"].strip()
     return {
+        "hip": hip,
         "name": name,
         "temp": temp_kelvin,
         "lum": lum,
         "spect": spect,
         "dist": dist,
         "radius": radius,
-        "right_asc": (hh, mm, ss),
-        "dec": dec,
+        "right_asc": data,
     }

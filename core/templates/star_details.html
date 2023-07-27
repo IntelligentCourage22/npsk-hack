@@ -118,6 +118,7 @@
     <div style="width: 50%; padding: 20px;">
         <!-- Star Details Display -->
         {% if star_details %}
+        <h2>Closest match: hip_id = {{star_hip}}</h2>
         {% for key, value in star_details.items %}
         <li><strong>{{ key }}:</strong> {{ value }}</li>
         {% endfor %}
